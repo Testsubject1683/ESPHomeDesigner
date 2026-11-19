@@ -12,4 +12,4 @@ export {
 } from './hardware_generators_display.js';
 
 export { generateSensorSection } from './hardware_generators_sensors.js';
-export { generateBinarySensorSection, generateButtonSection } from './hardware_generators_inputs.js';
+export { generateBinarySensorSection, generateButtonSection, generatePageSelectSection } from './hardware_generators_inputs.js';

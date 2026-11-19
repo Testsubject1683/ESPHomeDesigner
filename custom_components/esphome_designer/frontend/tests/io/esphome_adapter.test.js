@@ -65,6 +65,7 @@ vi.mock('../../js/io/hardware_generators.js', () => ({
     generateSensorSection: vi.fn(() => []),
     generateBinarySensorSection: vi.fn(() => []),
     generateButtonSection: vi.fn(() => []),
+    generatePageSelectSection: vi.fn(() => []),
     generateDisplaySection: vi.fn(() => ["display:"]),
     generateExtraComponents: vi.fn(() => []),
     generateAXP2101Section: vi.fn(() => []),

@@ -91,6 +91,7 @@ export class ESPHomeAdapter extends BaseAdapter {
             isLvgl,
             appState: AppState
         });
+        context.packageContent = packageContent;
 
         const { globalLines, requiresMaterialIcons } = buildGlobalExportSections({
             context,

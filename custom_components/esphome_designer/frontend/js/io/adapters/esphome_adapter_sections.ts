@@ -349,10 +349,19 @@ export function buildSensorSections({
         lines.push(...mergedSwitchLines.flatMap(line => line.split('\n').map(sub => "  " + sub)));
     }
 
-    if (!profile.isPackageBased && Generators.generateButtonSection) {
+    const packageContent = context.packageContent;
+    const packageHasButtonSection = typeof packageContent === "string" && /^button:\s*$/m.test(packageContent);
+    if ((!profile.isPackageBased || !packageHasButtonSection) && Generators.generateButtonSection) {
         const buttonLines = Generators.generateButtonSection(profile, pages.length, displayId);
         if (buttonLines.length > 0) {
             lines.push(...buttonLines);
+        }
+    }
+
+    if (Generators.generatePageSelectSection && pages.length > 1) {
+        const selectLines = Generators.generatePageSelectSection(pages);
+        if (selectLines.length > 0) {
+            lines.push(...selectLines);
         }
     }
 }

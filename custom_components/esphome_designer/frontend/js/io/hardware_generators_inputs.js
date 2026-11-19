@@ -217,6 +217,50 @@ export function generateBinarySensorSection(profile, numPages, displayId = "my_d
 }
 
 /**
+ * Emits a Home Assistant select entity that jumps directly to a page.
+ * Options are the layout's page names, so renaming pages in the editor
+ * automatically updates the entity on the next export.
+ *
+ * @param {any[]} pages
+ * @returns {string[]}
+ */
+export function generatePageSelectSection(pages) {
+    const lines = /** @type {string[]} */ ([]);
+    if (!Array.isArray(pages) || pages.length <= 1) return lines;
+
+    const names = pages.map((p, i) => (p && p.name ? String(p.name) : `Page ${i + 1}`));
+    const count = names.length;
+    const cNames = names.map((n) => `"${n.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`).join(', ');
+    const yamlOptions = names.map((n) => `      - ${JSON.stringify(n)}`).join('\n');
+
+    lines.push("select:");
+    lines.push("  - platform: template");
+    lines.push("    id: page_select");
+    lines.push("    name: \"Display Page\"");
+    lines.push("    icon: \"mdi:view-grid-outline\"");
+    lines.push("    options:");
+    lines.push(yamlOptions);
+    lines.push("    lambda: |-");
+    lines.push(`      const char* page_names[] = {${cNames}};`);
+    lines.push("      int p = id(display_page);");
+    lines.push(`      if (p < 0 || p >= ${count}) return {};`);
+    lines.push("      return page_names[p];");
+    lines.push("    set_action:");
+    lines.push("      - lambda: |-");
+    lines.push(`          const char* page_names[] = {${cNames}};`);
+    lines.push("          std::string sel(x.c_str(), x.size());");
+    lines.push(`          for (int i = 0; i < ${count}; i++) {`);
+    lines.push("            if (sel == page_names[i]) {");
+    lines.push("              id(change_page_to).execute(i);");
+    lines.push("              id(page_select).update();");
+    lines.push("              return;");
+    lines.push("            }");
+    lines.push("          }");
+    lines.push("");
+    return lines;
+}
+
+/**
  * @param {ProfileLike} profile
  * @param {number} numPages
  * @param {string} [displayId]

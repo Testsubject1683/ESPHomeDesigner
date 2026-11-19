@@ -6,7 +6,8 @@ import {
     generateTouchscreenSection as generateTouchscreenSectionHelper,
     generateSensorSection as generateSensorSectionHelper,
     generateBinarySensorSection as generateBinarySensorSectionHelper,
-    generateButtonSection as generateButtonSectionHelper
+    generateButtonSection as generateButtonSectionHelper,
+    generatePageSelectSection as generatePageSelectSectionHelper
 } from './hardware_generators_sections.js';
 import { resolveDisplayId } from './display_ids.js';
 
@@ -321,6 +322,14 @@ export function generateBinarySensorSection(profile, numPages, displayId = "my_d
  */
 export function generateButtonSection(profile, numPages, displayId = "my_display") {
     return generateButtonSectionHelper(profile, numPages, displayId);
+}
+
+/**
+ * @param {any[]} pages
+ * @returns {string[]}
+ */
+export function generatePageSelectSection(pages) {
+    return generatePageSelectSectionHelper(pages);
 }
 
 /**
