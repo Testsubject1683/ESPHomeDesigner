@@ -188,6 +188,7 @@ describe('weather_forecast render and properties', () => {
             id: 'weather_1',
             entity_id: 'weather.home',
             props: {
+                data_source: 'ha_template',
                 forecast_mode: 'hourly',
                 hourly_mode: 'relative',
                 relative_count: 2,
@@ -224,6 +225,7 @@ describe('weather_forecast render and properties', () => {
             id: 'weather_fixed',
             entity_id: 'weather.home',
             props: {
+                data_source: 'ha_template',
                 forecast_mode: 'hourly',
                 hourly_mode: 'fixed',
                 hourly_slots: '06,09,12',
@@ -265,6 +267,7 @@ describe('weather_forecast render and properties', () => {
             id: 'weather_daily',
             entity_id: 'weather.home',
             props: {
+                data_source: 'ha_template',
                 forecast_mode: 'daily',
                 days: 2,
                 temp_unit: 'F'

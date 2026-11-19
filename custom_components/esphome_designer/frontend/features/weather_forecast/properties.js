@@ -109,6 +109,16 @@ export const renderProperties = (panel, widget) => {
         AppState.updateWidget(widget.id, { entity_id: value });
     }, widget);
 
+    const dataSource = props.data_source || "esphome_action";
+    panel.addSelect("Data Source", dataSource, [
+        { value: "esphome_action", label: "ESPHome action calls (on-device, periodic)" },
+        { value: "ha_template", label: "HA template sensors (legacy)" }
+    ], setTextProp("data_source"));
+    if (dataSource === "esphome_action") {
+        panel.addLabeledInput("Refresh Interval", "text", props.refresh_interval || "1h", setTextProp("refresh_interval"));
+        panel.addHint("The device calls weather.get_forecasts itself on this interval (e.g. 30min, 1h). Requires ESPHome 2025.10+ and 'Allow the device to perform Home Assistant actions' in the HA device options. No HA template sensors are needed.");
+    }
+
     panel.addSelect("Forecast Mode", mode, [
         { value: "daily", label: "Daily Forecast" },
         { value: "hourly", label: "Hourly Forecast" }
@@ -144,6 +154,9 @@ export const renderProperties = (panel, widget) => {
     panel.addSelect("Unit", props.temp_unit || "C", ["C", "F"], setTextProp("temp_unit"));
     panel.addLabeledInput("Temp Precision", "number", props.precision !== undefined ? props.precision : 1, setIntProp("precision"));
 
+    if (dataSource === "esphome_action") {
+        panel.addHint("HA template YAML is not needed in ESPHome action mode; the device fetches the forecast itself.");
+    } else {
     /** @type {HTMLDivElement} */
     const btnGroup = document.createElement("div");
     btnGroup.style.display = "flex";
@@ -277,6 +290,7 @@ template:
     btnGroup.appendChild(copyBtn);
     panel.getContainer().appendChild(btnGroup);
     panel.addHint("Detailed YAML is also generated in the ESPHome export comments.");
+    }
     panel.endSection();
 
     panel.createSection("Layout", true);

@@ -74,6 +74,7 @@ describe('weather_forecast widget relative hourly mode', () => {
             id: 'testWeather2',
             type: 'weather_forecast',
             props: {
+                data_source: 'ha_template',
                 forecast_mode: 'hourly',
                 hourly_mode: 'relative',
                 relative_count: 2

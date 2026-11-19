@@ -16,6 +16,7 @@ describe('weather_forecast export_sensors', () => {
                 id: 'weather-card',
                 type: 'weather_forecast',
                 props: {
+                    data_source: 'ha_template',
                     days: 2,
                     start_offset: 1,
                     temp_unit: 'F'
@@ -49,6 +50,7 @@ describe('weather_forecast export_sensors', () => {
                     type: 'weather_forecast',
                     entity_id: 'weather.garden',
                     props: {
+                        data_source: 'ha_template',
                         forecast_mode: 'hourly',
                         hourly_mode: 'fixed',
                         hourly_slots: '06,09,12',
@@ -80,6 +82,7 @@ describe('weather_forecast export_sensors', () => {
                 {
                     type: 'weather_forecast',
                     props: {
+                        data_source: 'ha_template',
                         forecast_mode: 'hourly',
                         hourly_mode: 'relative',
                         relative_count: 2,
@@ -127,6 +130,7 @@ describe('weather_forecast export_sensors', () => {
                     id: 'weather-primary',
                     type: 'weather_forecast',
                     props: {
+                        data_source: 'ha_template',
                         days: 2,
                         start_offset: 0
                     }
@@ -135,6 +139,7 @@ describe('weather_forecast export_sensors', () => {
                     id: 'weather-secondary',
                     type: 'weather_forecast',
                     props: {
+                        data_source: 'ha_template',
                         days: 2,
                         start_offset: 0
                     }

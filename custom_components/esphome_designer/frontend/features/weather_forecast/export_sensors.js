@@ -1,5 +1,6 @@
 import { WEATHER_ICON_CODES } from '../weather_icon/shared.js';
 import { clampFontWeight } from '../../js/core/font_weights.js';
+import { getForecastPlan, getWidgetDataSource, globalIdForSensor } from './slot_plan.js';
 
 /**
  * @typedef {{
@@ -27,6 +28,54 @@ import { clampFontWeight } from '../../js/core/font_weights.js';
  */
 
 /**
+ * @param {import('./slot_plan.js').ForecastPlan} plan
+ * @param {import('./slot_plan.js').ForecastSlot} slot
+ * @param {string} base
+ * @returns {string}
+ */
+const slotDisplayName = (plan, slot, base) => {
+    if (plan.mode === "hourly") {
+        return plan.hourlyMode === "relative"
+            ? `${base} Plus ${slot.index + 1}h`
+            : `${base} Hour ${plan.actualSlots[slot.index]}00`;
+    }
+    return `${base} Day ${slot.dayIdx}`;
+};
+
+/**
+ * On-device action data source: local template sensors read the globals that
+ * the periodic weather.get_forecasts action call fills in.
+ *
+ * @param {WeatherForecastWidget} w
+ * @param {WeatherForecastExportContext} context
+ */
+const exportActionNumericSensors = (w, context) => {
+    const { lines } = context;
+    const plan = getForecastPlan(w);
+
+    plan.slots.forEach(slot => {
+        const numericIds = plan.mode === "hourly" ? [slot.highId] : [slot.highId, slot.lowId];
+        numericIds.forEach(sid => {
+            if (context.seenSensorIds && !context.seenSensorIds.has(sid)) {
+                if (context.seenSensorIds.size === 0) {
+                    lines.push("");
+                    lines.push("# Weather Forecast Numeric Sensors (on-device action source)");
+                }
+                context.seenSensorIds.add(sid);
+                const base = sid.includes("_low_") ? "Weather Low" : "Weather High";
+                lines.push("- platform: template");
+                lines.push(`  id: ${sid}`);
+                lines.push(`  name: "${slotDisplayName(plan, slot, base)}"`);
+                lines.push(`  unit_of_measurement: '${plan.unitSymbol}'`);
+                lines.push(`  internal: true`);
+                lines.push(`  lambda: 'return id(${globalIdForSensor(sid)});'`);
+                lines.push(`  update_interval: never`);
+            }
+        });
+    });
+};
+
+/**
  * @param {WeatherForecastExportContext} context
  */
 export const onExportNumericSensors = (context) => {
@@ -35,6 +84,10 @@ export const onExportNumericSensors = (context) => {
     if (weatherWidgets.length === 0) return;
 
     weatherWidgets.forEach(w => {
+        if (getWidgetDataSource(w) === "esphome_action") {
+            exportActionNumericSensors(w, context);
+            return;
+        }
         const mode = w.props?.forecast_mode || "daily";
         const hourlyMode = w.props?.hourly_mode === "relative" ? "relative" : "fixed";
         const relativeCount = parseInt(w.props?.relative_count || 5, 10);
@@ -145,6 +198,25 @@ export const onExportTextSensors = (context) => {
     let addedAny = false;
 
     targets.forEach(w => {
+        if (getWidgetDataSource(w) === "esphome_action") {
+            const plan = getForecastPlan(w);
+            plan.slots.forEach(slot => {
+                if (context.seenSensorIds && context.seenSensorIds.has(slot.condId)) return;
+                if (!addedAny) {
+                    lines.push("");
+                    lines.push("# Weather Forecast Condition Sensors (on-device action source)");
+                    addedAny = true;
+                }
+                if (context.seenSensorIds) context.seenSensorIds.add(slot.condId);
+                lines.push("- platform: template");
+                lines.push(`  id: ${slot.condId}`);
+                lines.push(`  name: "${slotDisplayName(plan, slot, "Weather Condition")}"`);
+                lines.push(`  internal: true`);
+                lines.push(`  lambda: 'return id(${globalIdForSensor(slot.condId)});'`);
+                lines.push(`  update_interval: never`);
+            });
+            return;
+        }
         const p = w.props || {};
         const mode = p.forecast_mode || "daily";
         const hourlyMode = p.hourly_mode === "relative" ? "relative" : "fixed";
@@ -192,7 +264,7 @@ export const onExportTextSensors = (context) => {
 
     /** @type {Map<string, WeatherForecastModeConfig>} */
     const modeConfigs = new Map();
-    targets.forEach(w => {
+    targets.filter(w => getWidgetDataSource(w) !== "esphome_action").forEach(w => {
         const p = w.props || {};
         const mode = p.forecast_mode || "daily";
         const hourlyMode = p.hourly_mode === "relative" ? "relative" : "fixed";

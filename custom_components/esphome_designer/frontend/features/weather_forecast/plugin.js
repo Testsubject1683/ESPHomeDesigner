@@ -1,6 +1,6 @@
 import { render } from './render.js';
 import { renderProperties } from './properties.js';
-import { collectRequirements, exportDoc, exportLVGL, exportOEPL, exportOpenDisplay, onExportNumericSensors, onExportTextSensors } from './exports.js';
+import { collectRequirements, exportDoc, exportLVGL, exportOEPL, exportOpenDisplay, onExportComponents, onExportGlobals, onExportNumericSensors, onExportTextSensors } from './exports.js';
 
 export default {
     id: "weather_forecast",
@@ -9,6 +9,8 @@ export default {
     supportedModes: ['lvgl', 'direct', 'oepl', 'opendisplay'],
 defaults: {
         weather_entity: "weather.forecast_home",
+        data_source: "esphome_action",
+        refresh_interval: "1h",
         forecast_mode: "daily",
         hourly_mode: "fixed",
         relative_count: 5,
@@ -46,5 +48,7 @@ defaults: {
     export: exportDoc,
     onExportNumericSensors,
     onExportTextSensors,
+    onExportGlobals,
+    onExportComponents,
     collectRequirements
 };

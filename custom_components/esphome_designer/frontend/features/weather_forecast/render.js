@@ -1,9 +1,99 @@
 import { AppState } from '@core/state';
+import { emit, EVENTS } from '../../js/core/events.js';
+import { HA_API_BASE, hasHaBackend } from '../../js/utils/env.js';
 import { formatHourLabel, getDayLabelSet } from './day_labels.js';
 import {
     getWeatherIconMeta,
     toWeatherMdiCharacter
 } from '../weather_icon/shared.js';
+
+/** @type {Record<string, { at: number, forecast: any[] }>} */
+const forecastCache = {};
+/** @type {Record<string, boolean>} */
+const forecastFetching = {};
+
+/**
+ * Fetches the forecast for a weather entity through the Home Assistant
+ * weather/get_forecasts service so the editor preview works without the
+ * legacy HA template sensors.
+ *
+ * @param {string} entity
+ * @param {string} type
+ */
+const fetchForecastPreview = (entity, type) => {
+    const key = `${entity}|${type}`;
+    if (forecastCache[key] || forecastFetching[key] || !hasHaBackend()) return;
+    forecastFetching[key] = true;
+    import('../../js/io/ha_api.js')
+        .then(async ({ haFetch, getHaHeaders }) => {
+            const resp = await haFetch(`${HA_API_BASE}/services/weather/get_forecasts`, {
+                method: 'POST',
+                headers: getHaHeaders(),
+                body: JSON.stringify({ entity_id: entity, type, return_response: true })
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+            const payload = data?.response ?? data;
+            const arr = payload?.[entity]?.forecast;
+            if (Array.isArray(arr)) {
+                forecastCache[key] = { at: Date.now(), forecast: arr };
+                emit(EVENTS.STATE_CHANGED);
+            }
+        })
+        .catch(() => {})
+        .finally(() => { forecastFetching[key] = false; });
+};
+
+/**
+ * @param {Record<string, any>} props
+ * @param {number} i
+ * @param {string} weatherEntity
+ * @returns {{ cond: string | null, high: number | null, low: number | null } | null}
+ */
+const getCachedForecastSlot = (props, i, weatherEntity) => {
+    const mode = props.forecast_mode || "daily";
+    const cached = forecastCache[`${weatherEntity}|${mode === "hourly" ? "hourly" : "daily"}`];
+    if (!cached) return null;
+    const fc = cached.forecast;
+    const startOffset = parseInt(props.start_offset || 0, 10);
+
+    if (mode !== "hourly") {
+        const entry = fc[i + startOffset];
+        if (!entry) return null;
+        return {
+            cond: typeof entry.condition === "string" ? entry.condition.toLowerCase() : null,
+            high: typeof entry.temperature === "number" ? entry.temperature : null,
+            low: typeof entry.templow === "number" ? entry.templow : null
+        };
+    }
+
+    const hourlyMode = props.hourly_mode === "relative" ? "relative" : "fixed";
+    const now = new Date();
+    /** @type {Date} */
+    let target;
+    if (hourlyMode === "relative") {
+        target = new Date(now.getTime());
+        target.setMinutes(0, 0, 0);
+        target.setHours(target.getHours() + i + 1);
+    } else {
+        const slots = String(props.hourly_slots || "06,09,12,15,18,21").split(',').map(s => s.trim()).filter(Boolean);
+        const slot = slots.slice(startOffset)[i];
+        if (!slot) return null;
+        target = new Date(now.getTime());
+        target.setHours(parseInt(slot, 10), 0, 0, 0);
+        if (now.getTime() > target.getTime() + 3600 * 1000) target.setDate(target.getDate() + 1);
+    }
+    const entry = fc.find(f => {
+        const t = new Date(f.datetime);
+        return !isNaN(t.getTime()) && t.getTime() === target.getTime();
+    });
+    if (!entry) return null;
+    return {
+        cond: typeof entry.condition === "string" ? entry.condition.toLowerCase() : null,
+        high: typeof entry.temperature === "number" ? entry.temperature : null,
+        low: null
+    };
+};
 
 /**
  * @typedef {{
@@ -100,6 +190,11 @@ export const render = (el, widget, { getColorStyle }) => {
         let liveHigh = null;
         let liveLow = null;
 
+        const dataSource = props.data_source || "esphome_action";
+        if (dataSource === "esphome_action" && weatherEntity) {
+            fetchForecastPreview(weatherEntity, mode === "hourly" ? "hourly" : "daily");
+        }
+
         if (AppState && AppState.entityStates) {
             const dayIdx = i + startOffset;
             let condId, highId, lowId, legacyHighId;
@@ -129,6 +224,15 @@ export const render = (el, widget, { getColorStyle }) => {
             if (condState && condState.state && condState.state !== "unknown") liveCond = condState.state.toLowerCase();
             if (highState && highState.state && highState.state !== "unknown") liveHigh = parseFloat(highState.state);
             if (lowState && lowState.state && lowState.state !== "unknown") liveLow = parseFloat(lowState.state);
+        }
+
+        if (dataSource === "esphome_action" && weatherEntity) {
+            const cachedSlot = getCachedForecastSlot(props, i, weatherEntity);
+            if (cachedSlot) {
+                if (cachedSlot.cond) liveCond = cachedSlot.cond;
+                if (cachedSlot.high !== null) liveHigh = cachedSlot.high;
+                if (cachedSlot.low !== null) liveLow = cachedSlot.low;
+            }
         }
 
         const dayLabel = document.createElement("div");
