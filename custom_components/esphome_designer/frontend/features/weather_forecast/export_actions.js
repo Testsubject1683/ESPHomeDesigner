@@ -98,7 +98,10 @@ const buildParseLambdaLines = (entity, slots, type) => {
     body.push(`JsonVariantConst data = response["response"];`);
     body.push(`if (data.isNull()) data = response;`);
     body.push(`JsonVariantConst fc = data["${entity}"]["forecast"];`);
-    body.push(`if (!fc.is<JsonArray>()) { ESP_LOGW("weather", "No forecast array in response for ${entity}"); return; }`);
+    body.push(`if (!fc.is<JsonArray>()) {`);
+    body.push(`  ESP_LOGW("weather", "No forecast array for ${entity}: response_empty=%d has_response_key=%d has_entity_key=%d (action responses need HA Core >= 2025.11 and ESPHome >= 2025.10)", response.isNull() ? 1 : 0, response["response"].isNull() ? 0 : 1, data["${entity}"].isNull() ? 0 : 1);`);
+    body.push(`  return;`);
+    body.push(`}`);
     body.push(`auto getf = [](JsonVariantConst v) -> float { return v.isNull() ? NAN : v.as<float>(); };`);
 
     if (type === "daily") {
@@ -235,6 +238,6 @@ export const onExportComponents = (context) => {
         lines,
         'interval',
         entries,
-        '# Weather Forecast Update Loop (on-device weather.get_forecasts action calls; requires ESPHome >= 2025.10 and the HA option "Allow the device to perform Home Assistant actions")'
+        '# Weather Forecast Update Loop (on-device weather.get_forecasts action calls; requires ESPHome >= 2025.10, HA Core >= 2025.11, and the HA option "Allow the device to perform Home Assistant actions")'
     );
 };

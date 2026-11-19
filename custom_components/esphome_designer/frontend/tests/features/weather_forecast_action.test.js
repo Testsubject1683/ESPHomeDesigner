@@ -110,6 +110,9 @@ describe('weather_forecast esphome_action data source', () => {
         expect(output).toContain('capture_response: true');
         expect(output).toContain('on_success:');
         expect(output).toContain('JsonVariantConst fc = data["weather.home"]["forecast"];');
+        expect(output).toContain('No forecast array for weather.home');
+        expect(output).toContain('has_response_key=%d has_entity_key=%d');
+        expect(output).toContain('HA Core >= 2025.11');
         expect(output).toContain('id(weather_g_high_day0) = getf(e["temperature"]);');
         expect(output).toContain('id(weather_g_low_day1) = getf(e["templow"]);');
         expect(output).toContain('id(weather_g_cond_day0) = std::string(e["condition"] | "");');

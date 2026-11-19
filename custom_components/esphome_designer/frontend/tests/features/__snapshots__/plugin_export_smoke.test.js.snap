@@ -4418,7 +4418,7 @@ exports[`Plugin Export Smoke Tests > Export for weather_forecast > should export
 
 exports[`Plugin Export Smoke Tests > Export for weather_forecast > should handle onExportComponents with stable output 1`] = `
 [
-  "# Weather Forecast Update Loop (on-device weather.get_forecasts action calls; requires ESPHome >= 2025.10 and the HA option "Allow the device to perform Home Assistant actions")",
+  "# Weather Forecast Update Loop (on-device weather.get_forecasts action calls; requires ESPHome >= 2025.10, HA Core >= 2025.11, and the HA option "Allow the device to perform Home Assistant actions")",
   "interval:",
   "  - interval: 1h",
   "    startup_delay: 20s",
@@ -4438,7 +4438,10 @@ exports[`Plugin Export Smoke Tests > Export for weather_forecast > should handle
   "                      JsonVariantConst data = response["response"];",
   "                      if (data.isNull()) data = response;",
   "                      JsonVariantConst fc = data["weather.forecast_home"]["forecast"];",
-  "                      if (!fc.is<JsonArray>()) { ESP_LOGW("weather", "No forecast array in response for weather.forecast_home"); return; }",
+  "                      if (!fc.is<JsonArray>()) {",
+  "                        ESP_LOGW("weather", "No forecast array for weather.forecast_home: response_empty=%d has_response_key=%d has_entity_key=%d (action responses need HA Core >= 2025.11 and ESPHome >= 2025.10)", response.isNull() ? 1 : 0, response["response"].isNull() ? 0 : 1, data["weather.forecast_home"].isNull() ? 0 : 1);",
+  "                        return;",
+  "                      }",
   "                      auto getf = [](JsonVariantConst v) -> float { return v.isNull() ? NAN : v.as<float>(); };",
   "                      if (0 < fc.size()) {",
   "                        JsonVariantConst e = fc[0];",
