@@ -258,6 +258,15 @@ script:
       - component.update: epaper_display
       - delay: !lambda 'return id(page_refresh_current_s) * 1000;'
       - script.execute: manage_run_and_sleep
+on_boot:
+  priority: 600
+  then:
+    - delay: 2s
+    - if:
+        condition:
+          lambda: 'return !id(manage_run_and_sleep).is_running();'
+        then:
+          - script.execute: manage_run_and_sleep
 display:
   - platform: waveshare_epaper
     id: epaper_display

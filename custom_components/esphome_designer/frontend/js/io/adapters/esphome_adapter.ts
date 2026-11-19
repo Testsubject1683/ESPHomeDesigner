@@ -137,6 +137,25 @@ export class ESPHomeAdapter extends BaseAdapter {
             lines.push(...scriptLines);
         }
 
+        // Boot: start the refresh/auto-cycle loop. auto_cycle_timer is kicked off
+        // inside manage_run_and_sleep (issue #299), so without an on_boot starter
+        // neither the periodic refresh nor page cycling ever runs on devices whose
+        // hardware recipe has no on_boot block (e.g. GeekMagic Mini).
+        const packageHasOnBoot = typeof packageContent === "string" && /^on_boot:\s*$/m.test(packageContent);
+        if (!layout.isSelectionSnippet && !packageHasOnBoot) {
+            lines.push(
+                "on_boot:",
+                "  priority: 600",
+                "  then:",
+                "    - delay: 2s",
+                "    - if:",
+                "        condition:",
+                "          lambda: 'return !id(manage_run_and_sleep).is_running();'",
+                "        then:",
+                "          - script.execute: manage_run_and_sleep"
+            );
+        }
+
         // 6.5 LVGL (If supported)
         let hasLvgl = false;
         if (isLvgl && generateLVGLSnippet) {
