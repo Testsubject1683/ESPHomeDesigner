@@ -109,7 +109,9 @@ describe('weather_forecast esphome_action data source', () => {
         expect(output).toContain('type: daily');
         expect(output).toContain('capture_response: true');
         expect(output).toContain('on_success:');
-        expect(output).toContain('JsonVariantConst fc = data["weather.home"]["forecast"];');
+        expect(output).toContain('JsonArrayConst fc = data["weather.home"]["forecast"].as<JsonArrayConst>();');
+        expect(output).toContain('if (fc.isNull()) {');
+        expect(output).not.toContain('is<JsonArray>()');
         expect(output).toContain('No forecast array for weather.home');
         expect(output).toContain('has_response_key=%d has_entity_key=%d');
         expect(output).toContain('HA Core >= 2025.11');
