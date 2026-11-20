@@ -22,34 +22,46 @@ const twoPageLayout = (model) => ({
     ]
 });
 
-describe('on_boot starts the refresh/auto-cycle loop', () => {
-    it('emits an active on_boot that starts manage_run_and_sleep', async () => {
+const bootStarterEntries = [
+    '  - interval: 30s',
+    '    startup_delay: 2s',
+    "            lambda: 'return !id(manage_run_and_sleep).is_running();'",
+    '            - script.execute: manage_run_and_sleep'
+];
+
+describe('interval boot starter starts the refresh/auto-cycle loop', () => {
+    it('emits a top-level interval: starter (never top-level on_boot) for built-in profiles', async () => {
         registry.register(textPlugin);
         const adapter = new ESPHomeAdapter();
         const yaml = await adapter.generate(twoPageLayout('reterminal_e1001'));
 
-        expect(yaml).toContain('\non_boot:');
-        expect(yaml).toContain('- script.execute: manage_run_and_sleep');
-        expect(yaml).toContain("lambda: 'return !id(manage_run_and_sleep).is_running();'");
+        expect(yaml.match(/^interval:/gm)).toHaveLength(1);
+        for (const entry of bootStarterEntries) expect(yaml).toContain(entry);
+        expect(yaml).not.toMatch(/^on_boot:/m);
         expect(yaml).toContain('- id: auto_cycle_timer');
     });
 
-    it('emits on_boot for package-based profiles whose recipe has none (GeekMagic Mini)', async () => {
+    it('emits the interval starter for package-based profiles whose recipe has no on_boot (GeekMagic Mini)', async () => {
         registry.register(textPlugin);
         const adapter = new ESPHomeAdapter();
         adapter.fetchHardwarePackage = async () => 'display:\n  - platform: mipi_spi\n    id: epaper_display\n';
         const yaml = await adapter.generate(twoPageLayout('geekmagic_mini_esp8266'));
 
-        expect(yaml.match(/^on_boot:/gm)).toHaveLength(1);
+        expect(yaml.match(/^interval:/gm)).toHaveLength(1);
+        for (const entry of bootStarterEntries) expect(yaml).toContain(entry);
+        expect(yaml).not.toMatch(/^on_boot:/m);
         expect(yaml).toContain('- script.execute: manage_run_and_sleep');
     });
 
-    it('does not duplicate on_boot when the hardware package already defines one', async () => {
+    it('merges the starter into the package interval: section without duplicating the header', async () => {
         registry.register(textPlugin);
         const adapter = new ESPHomeAdapter();
-        adapter.fetchHardwarePackage = async () => 'on_boot:\n  priority: 600\n  then:\n    - script.execute: manage_run_and_sleep\n';
+        adapter.fetchHardwarePackage = async () => 'interval:\n  - interval: 60s\n    then:\n      - logger.log: pkg tick\n';
         const yaml = await adapter.generate(twoPageLayout('geekmagic_mini_esp8266'));
 
-        expect(yaml.match(/^on_boot:/gm)).toHaveLength(1);
+        expect(yaml.match(/^interval:/gm)).toHaveLength(1);
+        expect(yaml).toContain('  - interval: 60s');
+        for (const entry of bootStarterEntries) expect(yaml).toContain(entry);
+        expect(yaml).not.toMatch(/^on_boot:/m);
     });
 });

@@ -25,6 +25,22 @@ import { buildGlobalExportSections, appendMqttSection, sortExportPlugins } from 
 import { detectRenderingMode, resolveAdapterProfile } from './esphome_adapter_profile.js';
 import { processPendingTriggers, buildInfrastructureLines, buildSensorSections } from './esphome_adapter_sections.js';
 
+/**
+ * Inserts entries into an existing top-level `interval:` section, or creates
+ * the section if missing. Used for snippet-safe boot starters.
+ * @param {string[]} lines
+ * @param {string[]} entries
+ */
+function insertIntervalEntries(lines: string[], entries: string[]): void {
+    const headerIdx = lines.findIndex(l => l === "interval:");
+    if (headerIdx === -1) {
+        if (lines.length > 0 && lines[lines.length - 1].trim() !== "") lines.push("");
+        lines.push("interval:", ...entries);
+        return;
+    }
+    lines.splice(headerIdx + 1, 0, ...entries);
+}
+
 export class ESPHomeAdapter extends BaseAdapter {
     static adapterName = 'ESPHomeAdapter';
 
@@ -138,22 +154,23 @@ export class ESPHomeAdapter extends BaseAdapter {
         }
 
         // Boot: start the refresh/auto-cycle loop. auto_cycle_timer is kicked off
-        // inside manage_run_and_sleep (issue #299), so without an on_boot starter
-        // neither the periodic refresh nor page cycling ever runs on devices whose
-        // hardware recipe has no on_boot block (e.g. GeekMagic Mini).
-        const packageHasOnBoot = typeof packageContent === "string" && /^on_boot:\s*$/m.test(packageContent);
-        if (!layout.isSelectionSnippet && !packageHasOnBoot) {
-            lines.push(
-                "on_boot:",
-                "  priority: 600",
-                "  then:",
-                "    - delay: 2s",
-                "    - if:",
-                "        condition:",
-                "          lambda: 'return !id(manage_run_and_sleep).is_running();'",
-                "        then:",
-                "          - script.execute: manage_run_and_sleep"
-            );
+        // inside manage_run_and_sleep (issue #299), so without a boot starter neither
+        // the periodic refresh nor page cycling ever runs on devices whose hardware
+        // recipe has no on_boot block (e.g. GeekMagic Mini). A top-level on_boot: is
+        // invalid ESPHome (it must live under esphome:, which snippets auto-comment),
+        // so the starter is an interval entry with startup_delay + an is_running()
+        // guard; interval: is a normal mergeable section, so this is snippet-safe.
+        if (!layout.isSelectionSnippet) {
+            insertIntervalEntries(lines, [
+                "  - interval: 30s",
+                "    startup_delay: 2s",
+                "    then:",
+                "      - if:",
+                "          condition:",
+                "            lambda: 'return !id(manage_run_and_sleep).is_running();'",
+                "          then:",
+                "            - script.execute: manage_run_and_sleep"
+            ]);
         }
 
         // 6.5 LVGL (If supported)
