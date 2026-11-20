@@ -157,6 +157,7 @@ export function generateScriptSection(payload, pages, profile) {
         lines.push("            // Set debounce time BEFORE display update (update takes ~1.6s)");
             lines.push("            id(last_page_switch_time) = now;");
             lines.push("            id(display_page) = target;");
+            lines.push("            id(page_select).update();");
             if (!isLvgl) lines.push(`            id(${displayId})->update();`);
             lines.push(`            ESP_LOGI("display", "Switched to page %d", target);`);
         if (isBacklightStrategy) {

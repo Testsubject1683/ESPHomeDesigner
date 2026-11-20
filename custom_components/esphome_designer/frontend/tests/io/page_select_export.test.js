@@ -103,4 +103,22 @@ describe('page select in exported YAML', () => {
         expect(yaml).not.toContain('\nselect:');
         expect(yaml).not.toContain('page_select');
     });
+
+    it('refreshes the select inside change_page_to so on-device page changes update HA', async () => {
+        registry.register(textPlugin);
+        const adapter = new ESPHomeAdapter();
+        const yaml = await adapter.generate(layoutWithPages('reterminal_e1001', ['Home', 'Second']));
+
+        expect(yaml).toContain('id: change_page_to');
+        expect(yaml).toMatch(/id\(display_page\) = target;\s*\n\s*id\(page_select\)\.update\(\);/);
+    });
+
+    it('does not reference page_select in change_page_to for single-page layouts', async () => {
+        registry.register(textPlugin);
+        const adapter = new ESPHomeAdapter();
+        const yaml = await adapter.generate(layoutWithPages('reterminal_e1001', ['Only']));
+
+        expect(yaml).not.toContain('id: change_page_to');
+        expect(yaml).not.toContain('page_select');
+    });
 });
