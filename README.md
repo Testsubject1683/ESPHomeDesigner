@@ -4,7 +4,7 @@
 
 > **Fork note — divergence from upstream `koosoli/ESPHomeDesigner`**
 >
-> This fork carries branch `vibe/weather-esphome-action-datasource-21c4b7` on top of upstream `main` @ `62e0a88` (v1.0.0-rc.48). Changes, newest first (keep this list updated as commits land on the branch):
+> This fork diverges from upstream `main` @ `62e0a88` (v1.0.0-rc.48). Changes, newest first (keep this list updated as new commits land):
 >
 > - `61b895e` — Export now emits an active `on_boot:` that starts the `manage_run_and_sleep` refresh loop (guarded by `is_running()`), unless the hardware recipe already defines its own `on_boot:`. Fixes periodic refresh and auto page cycling on recipes without `on_boot` (e.g. GeekMagic Mini), where previously only a commented-out `on_boot:` instruction was emitted.
 > - `20762b6` — Multi-page layouts now auto-generate a Home Assistant `select:` entity ("Display Page", one option per page name, wired to `change_page_to`), and the Next/Previous/Go-to-Page/Refresh template buttons are now also emitted for package-based hardware recipes (skipped when the recipe already has its own `button:` section).
