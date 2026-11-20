@@ -2,6 +2,16 @@
 
 **A visual drag-and-drop editor for smart displays, supporting ESPHome, OpenEpaperLink (OEPL), and OpenDisplay - running as a Home Assistant integration or a standalone web app.**
 
+> **Fork note — divergence from upstream `koosoli/ESPHomeDesigner`**
+>
+> This fork carries branch `vibe/weather-esphome-action-datasource-21c4b7` on top of upstream `main` @ `62e0a88` (v1.0.0-rc.48). Changes, newest first (keep this list updated as commits land on the branch):
+>
+> - `61b895e` — Export now emits an active `on_boot:` that starts the `manage_run_and_sleep` refresh loop (guarded by `is_running()`), unless the hardware recipe already defines its own `on_boot:`. Fixes periodic refresh and auto page cycling on recipes without `on_boot` (e.g. GeekMagic Mini), where previously only a commented-out `on_boot:` instruction was emitted.
+> - `20762b6` — Multi-page layouts now auto-generate a Home Assistant `select:` entity ("Display Page", one option per page name, wired to `change_page_to`), and the Next/Previous/Go-to-Page/Refresh template buttons are now also emitted for package-based hardware recipes (skipped when the recipe already has its own `button:` section).
+> - `18ddcde` — Weather action-mode `on_success` lambda uses `JsonArrayConst` (`as<JsonArrayConst>()` + `isNull()`); in ArduinoJson v7, `is<JsonArray>()` on a `JsonVariantConst` always returns false, so the forecast parse always bailed with "No forecast array".
+> - `0a74221` — Weather action-mode lambda logs a diagnostic (`response_empty` / `has_response_key` / `has_entity_key`) when the forecast array is missing, and the exported comments/properties hint state the requirements: ESPHome >= 2025.10, HA Core >= 2025.11 (action-response forwarding), plus the HA "allow device actions" option.
+> - `4ca0c89` — `weather_forecast` gains a `data_source` prop (default `esphome_action`): the device itself periodically calls `weather.get_forecasts` via `homeassistant.action` with `capture_response: true`, parses the response into per-slot globals, and feeds the same local template-sensor IDs (display lambdas unchanged). New `refresh_interval` prop (default `1h`). The legacy HA-template-sensor flow remains available as `data_source: "ha_template"`. Editor preview fetches the forecast through the HA `weather/get_forecasts` service in action mode.
+
 <div align="center">
   <a href="https://github.com/sponsors/koosoli">
     <img src="https://img.shields.io/badge/Sponsor-Project-ff69b4?style=for-the-badge&logo=github-sponsors" alt="Sponsor Project">
