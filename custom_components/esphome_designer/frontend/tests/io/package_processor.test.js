@@ -46,6 +46,31 @@ font:
       expect(sanitized).toContain('# rp2: # (Auto-commented)');
       expect(sanitized).toContain('#   board: rpipico2w');
     });
+
+    it('comments out flow-style system keys (single-line maps)', () => {
+      const yaml = 'esphome: {min_version: 2025.5.0}\n\nesp8266: {board: esp01_1m}\n\nspi: {clk_pin: GPIO14}\n\ndisplay:\n  - platform: mipi_spi';
+      const sanitized = sanitizePackageContent(yaml);
+
+      expect(sanitized).toContain('# esphome: {min_version: 2025.5.0}');
+      expect(sanitized).toContain('# esp8266: {board: esp01_1m}');
+      expect(sanitized).not.toMatch(/^esphome:/m);
+      expect(sanitized).not.toMatch(/^esp8266:/m);
+
+      // Non-system keys stay active, whether flow-style or block-style
+      expect(sanitized).toContain('spi: {clk_pin: GPIO14}');
+      expect(sanitized).toContain('display:');
+      expect(sanitized).toContain('  - platform: mipi_spi');
+    });
+
+    it('comments flow-style platform keys in the bundled GeekMagic Mini recipe', () => {
+      const sanitized = sanitizePackageContent(geekMagicMiniYaml);
+      expect(sanitized).not.toMatch(/^esphome:/m);
+      expect(sanitized).not.toMatch(/^esp8266:/m);
+      expect(sanitized).toMatch(/^# esphome:/m);
+      expect(sanitized).toMatch(/^# esp8266:/m);
+      expect(sanitized).toMatch(/^display:/m);
+      expect(sanitized).toMatch(/^spi:/m);
+    });
   });
 
   describe('processPackageContent', () => {

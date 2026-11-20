@@ -22,14 +22,17 @@ export const sanitizePackageContent = (yaml) => {
         const trimmed = line.trim();
         if (trimmed.length === 0) { sanitized.push(line); continue; }
         const indent = (line.match(/^\s*/) || [""])[0].length;
-        if (indent === 0 && trimmed.endsWith(':')) {
-            inSystemBlock = systemKeys.some(k => trimmed.startsWith(k));
-            if (inSystemBlock) sanitized.push("# " + line + " # (Auto-commented)");
+        const keyMatch = indent === 0 ? trimmed.match(/^([a-z_0-9]+):/) : null;
+        if (keyMatch) {
+            const key = `${keyMatch[1]}:`;
+            const isSystem = systemKeys.includes(key);
+            inSystemBlock = isSystem && trimmed.endsWith(':');
+            if (isSystem) sanitized.push("# " + line + " # (Auto-commented)");
             else sanitized.push(line);
-        } else {
-            if (inSystemBlock) sanitized.push("# " + line);
-            else sanitized.push(line);
+            continue;
         }
+        if (inSystemBlock) sanitized.push("# " + line);
+        else sanitized.push(line);
     }
     return sanitized.join('\n');
 };
