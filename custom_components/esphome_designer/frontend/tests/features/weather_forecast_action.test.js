@@ -186,4 +186,45 @@ describe('weather_forecast esphome_action data source', () => {
         expect(output).toContain('if (t.timestamp > target + 3600) target += 86400;');
         expect(output).toContain('id(weather_g_high_h0900) = getf(e["temperature"]);');
     });
+
+    it('parses ISO datetime offsets so non-UTC forecast timestamps still match', () => {
+        const lines = [];
+        onExportComponents({ lines, widgets: [actionWidget({}, {
+            forecast_mode: 'hourly',
+            hourly_mode: 'relative',
+            relative_count: 1
+        })], displayId: 'd', isLvgl: false });
+        const output = lines.join('\n');
+
+        expect(output).toContain('et.recalc_timestamp_utc(false);');
+        expect(output).toContain("if (dt.size() > 19 && (dt[19] == '+' || dt[19] == '-')) {");
+        expect(output).toContain("int sign = dt[19] == '-' ? -1 : 1;");
+        expect(output).toContain('ts -= (time_t) sign * (oh * 3600 + om * 60);');
+    });
+
+    it('logs a diagnostic when the hourly forecast array is non-empty but no slot matches', () => {
+        const lines = [];
+        onExportComponents({ lines, widgets: [actionWidget({}, {
+            forecast_mode: 'hourly',
+            hourly_mode: 'relative',
+            relative_count: 2
+        })], displayId: 'd', isLvgl: false });
+        const output = lines.join('\n');
+
+        expect(output).toContain('int matched = 0;');
+        expect(output).toContain('matched++;');
+        expect(output).toContain('if (matched == 0 && fc.size() > 0) {');
+        expect(output).toContain('ESP_LOGW("weather", "hourly: no forecast entry matched for weather.home (entries=%d first_datetime=%s)"');
+    });
+
+    it('does not emit hourly timestamp matching for daily-only widgets', () => {
+        const lines = [];
+        onExportComponents({ lines, widgets: [actionWidget({}, { days: 2 })], displayId: 'd', isLvgl: false });
+        const output = lines.join('\n');
+
+        expect(output).not.toContain('parse_ts');
+        expect(output).not.toContain('int matched = 0;');
+        expect(output).not.toContain('hourly: no forecast entry matched');
+        expect(output).toContain('if (0 < fc.size()) {');
+    });
 });

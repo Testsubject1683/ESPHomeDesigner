@@ -122,6 +122,9 @@ const buildParseLambdaLines = (entity, slots, type) => {
     body.push(`if (!t.is_valid()) return;`);
     body.push(`time_t base_hour = (t.timestamp / 3600) * 3600;`);
     body.push(`time_t day_start = t.timestamp - ((time_t) t.hour * 3600 + (time_t) t.minute * 60 + t.second);`);
+    // HA passes forecast datetimes through unnormalized: the wall-clock part may
+    // carry a non-UTC offset (e.g. ...T15:00:00+01:00). Parse that offset so the
+    // result is a true UTC epoch regardless of the source timezone.
     body.push(`auto parse_ts = [](const std::string &dt) -> time_t {`);
     body.push(`  if (dt.size() < 19) return (time_t) -1;`);
     body.push(`  std::string norm = dt.substr(0, 19);`);
@@ -129,8 +132,19 @@ const buildParseLambdaLines = (entity, slots, type) => {
     body.push(`  ESPTime et{};`);
     body.push(`  if (!ESPTime::strptime(norm, et)) return (time_t) -1;`);
     body.push(`  et.recalc_timestamp_utc(false);`);
-    body.push(`  return et.timestamp;`);
+    body.push(`  time_t ts = et.timestamp;`);
+    body.push(`  if (dt.size() > 19 && (dt[19] == '+' || dt[19] == '-')) {`);
+    body.push(`    int sign = dt[19] == '-' ? -1 : 1;`);
+    body.push(`    std::string off = dt.substr(20);`);
+    body.push(`    int oh = 0, om = 0;`);
+    body.push(`    if (off.size() >= 5 && off[2] == ':') { oh = atoi(off.substr(0, 2).c_str()); om = atoi(off.substr(3, 2).c_str()); }`);
+    body.push(`    else if (off.size() >= 4) { oh = atoi(off.substr(0, 2).c_str()); om = atoi(off.substr(2, 2).c_str()); }`);
+    body.push(`    else if (off.size() >= 2) { oh = atoi(off.substr(0, 2).c_str()); }`);
+    body.push(`    ts -= (time_t) sign * (oh * 3600 + om * 60);`);
+    body.push(`  }`);
+    body.push(`  return ts;`);
     body.push(`};`);
+    body.push(`int matched = 0;`);
 
     slots.forEach(slot => {
         if (slot.kind.type !== "hourly") return;
@@ -145,11 +159,15 @@ const buildParseLambdaLines = (entity, slots, type) => {
         body.push(`    if (parse_ts(std::string(e["datetime"] | "")) == target) {`);
         body.push(`      id(${globalIdForSensor(slot.highId)}) = getf(e["temperature"]);`);
         body.push(`      id(${globalIdForSensor(slot.condId)}) = std::string(e["condition"] | "");`);
+        body.push(`      matched++;`);
         body.push(`      break;`);
         body.push(`    }`);
         body.push(`  }`);
         body.push(`}`);
     });
+    body.push(`if (matched == 0 && fc.size() > 0) {`);
+    body.push(`  ESP_LOGW("weather", "hourly: no forecast entry matched for ${entity} (entries=%d first_datetime=%s)", (int) fc.size(), std::string(fc[0]["datetime"] | "").c_str());`);
+    body.push(`}`);
     return body;
 };
 
