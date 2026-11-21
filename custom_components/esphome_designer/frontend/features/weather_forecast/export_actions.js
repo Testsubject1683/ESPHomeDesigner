@@ -95,11 +95,18 @@ export const onExportGlobals = (context) => {
 const buildParseLambdaLines = (entity, slots, type) => {
     /** @type {string[]} */
     const body = [];
-    body.push(`JsonVariantConst data = response["response"];`);
-    body.push(`if (data.isNull()) data = response;`);
-    body.push(`JsonArrayConst fc = data["${entity}"]["forecast"].as<JsonArrayConst>();`);
+    // The action's response_template (rendered HA-side) delivers a compact JSON
+    // array string: [[datetime, temperature, templow, condition], ...]. Keeping only
+    // these fields keeps the response frame below ESP8266's 8 KiB API frame limit
+    // (MAX_MESSAGE_SIZE); the raw forecast array can exceed it (BAD_DATA_PACKET).
+    body.push(`JsonDocument doc;`);
+    body.push(`if (deserializeJson(doc, response["response"].as<const char*>())) {`);
+    body.push(`  ESP_LOGW("weather", "Bad forecast JSON for ${entity} (needs HA Core >= 2025.11, ESPHome >= 2025.10, capture_response + response_template)");`);
+    body.push(`  return;`);
+    body.push(`}`);
+    body.push(`JsonArrayConst fc = doc.as<JsonArrayConst>();`);
     body.push(`if (fc.isNull()) {`);
-    body.push(`  ESP_LOGW("weather", "No forecast array for ${entity}: response_empty=%d has_response_key=%d has_entity_key=%d (action responses need HA Core >= 2025.11 and ESPHome >= 2025.10)", response.isNull() ? 1 : 0, response["response"].isNull() ? 0 : 1, data["${entity}"].isNull() ? 0 : 1);`);
+    body.push(`  ESP_LOGW("weather", "No forecast array for ${entity}: response_empty=%d has_response_key=%d (action responses need HA Core >= 2025.11 and ESPHome >= 2025.10)", response.isNull() ? 1 : 0, response["response"].isNull() ? 0 : 1);`);
     body.push(`  return;`);
     body.push(`}`);
     body.push(`auto getf = [](JsonVariantConst v) -> float { return v.isNull() ? NAN : v.as<float>(); };`);
@@ -110,9 +117,9 @@ const buildParseLambdaLines = (entity, slots, type) => {
             const d = slot.kind.dayIndex;
             body.push(`if (${d} < fc.size()) {`);
             body.push(`  JsonVariantConst e = fc[${d}];`);
-            body.push(`  id(${globalIdForSensor(slot.highId)}) = getf(e["temperature"]);`);
-            body.push(`  id(${globalIdForSensor(slot.lowId)}) = getf(e["templow"]);`);
-            body.push(`  id(${globalIdForSensor(slot.condId)}) = std::string(e["condition"] | "");`);
+            body.push(`  id(${globalIdForSensor(slot.highId)}) = getf(e[1]);`);
+            body.push(`  id(${globalIdForSensor(slot.lowId)}) = getf(e[2]);`);
+            body.push(`  id(${globalIdForSensor(slot.condId)}) = std::string(e[3] | "");`);
             body.push(`}`);
         });
         return body;
@@ -144,7 +151,7 @@ const buildParseLambdaLines = (entity, slots, type) => {
     body.push(`time_t now_ts = t.is_valid() ? t.timestamp : (time_t) -1;`);
     body.push(`int lhour = t.hour, lmin = t.minute, lsec = t.second;`);
     body.push(`if (now_ts < 0 && fc.size() > 0) {`);
-    body.push(`  now_ts = parse_ts(std::string(fc[0]["datetime"] | ""));`);
+    body.push(`  now_ts = parse_ts(std::string(fc[0][0] | ""));`);
     body.push(`  if (now_ts >= 0) {`);
     body.push(`    ESPTime nt = ESPTime::from_epoch_utc(now_ts);`);
     body.push(`    lhour = nt.hour; lmin = nt.minute; lsec = nt.second;`);
@@ -169,9 +176,9 @@ const buildParseLambdaLines = (entity, slots, type) => {
             body.push(`  if (now_ts > target + 3600) target += 86400;`);
         }
         body.push(`  for (JsonVariantConst e : fc) {`);
-        body.push(`    if (parse_ts(std::string(e["datetime"] | "")) == target) {`);
-        body.push(`      id(${globalIdForSensor(slot.highId)}) = getf(e["temperature"]);`);
-        body.push(`      id(${globalIdForSensor(slot.condId)}) = std::string(e["condition"] | "");`);
+        body.push(`    if (parse_ts(std::string(e[0] | "")) == target) {`);
+        body.push(`      id(${globalIdForSensor(slot.highId)}) = getf(e[1]);`);
+        body.push(`      id(${globalIdForSensor(slot.condId)}) = std::string(e[3] | "");`);
         body.push(`      matched++;`);
         body.push(`      break;`);
         body.push(`    }`);
@@ -179,7 +186,7 @@ const buildParseLambdaLines = (entity, slots, type) => {
         body.push(`}`);
     });
     body.push(`if (matched == 0 && fc.size() > 0) {`);
-    body.push(`  ESP_LOGW("weather", "hourly: no forecast entry matched for ${entity} (entries=%d first_datetime=%s)", (int) fc.size(), std::string(fc[0]["datetime"] | "").c_str());`);
+    body.push(`  ESP_LOGW("weather", "hourly: no forecast entry matched for ${entity} (entries=%d first_datetime=%s)", (int) fc.size(), std::string(fc[0][0] | "").c_str());`);
     body.push(`}`);
     body.push(`ESP_LOGI("weather", "hourly parse ${entity}: entries=%d matched=%d have_time=%d", (int) fc.size(), matched, t.is_valid() ? 1 : 0);`);
     return body;
@@ -243,6 +250,10 @@ export const onExportComponents = (context) => {
         entries.push(`                  entity_id: ${group.entity}`);
         entries.push(`                  type: ${group.type}`);
         entries.push(`                capture_response: true`);
+        // HA-side Jinja compaction: only [datetime, temperature, templow, condition] per
+        // entry are sent back, keeping the frame under ESP8266's 8 KiB API limit.
+        entries.push(`                response_template: >-`);
+        entries.push(`                  {% set fc = response['${group.entity}']['forecast'] %}{% set out = [] %}{% for e in fc %}{% set _ = out.append([e.get('datetime'), e.get('temperature'), e.get('templow'), e.get('condition')]) %}{% endfor %}{{ out | tojson }}`);
         entries.push(`                on_success:`);
         entries.push(`                  - lambda: |-`);
         lambdaBody.forEach(l => entries.push(`                      ${l}`));

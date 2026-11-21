@@ -109,15 +109,19 @@ describe('weather_forecast esphome_action data source', () => {
         expect(output).toContain('type: daily');
         expect(output).toContain('capture_response: true');
         expect(output).toContain('on_success:');
-        expect(output).toContain('JsonArrayConst fc = data["weather.home"]["forecast"].as<JsonArrayConst>();');
+        expect(output).toContain('JsonArrayConst fc = doc.as<JsonArrayConst>();');
+        expect(output).toContain('deserializeJson(doc, response["response"].as<const char*>())');
+        expect(output).toContain('response_template: >-');
+        expect(output).toContain("response['weather.home']['forecast']");
+        expect(output).toContain('tojson');
         expect(output).toContain('if (fc.isNull()) {');
         expect(output).not.toContain('is<JsonArray>()');
         expect(output).toContain('No forecast array for weather.home');
-        expect(output).toContain('has_response_key=%d has_entity_key=%d');
+        expect(output).toContain('response_empty=%d has_response_key=%d');
         expect(output).toContain('HA Core >= 2025.11');
-        expect(output).toContain('id(weather_g_high_day0) = getf(e["temperature"]);');
-        expect(output).toContain('id(weather_g_low_day1) = getf(e["templow"]);');
-        expect(output).toContain('id(weather_g_cond_day0) = std::string(e["condition"] | "");');
+        expect(output).toContain('id(weather_g_high_day0) = getf(e[1]);');
+        expect(output).toContain('id(weather_g_low_day1) = getf(e[2]);');
+        expect(output).toContain('id(weather_g_cond_day0) = std::string(e[3] | "");');
         expect(output).toContain('- component.update: weather_high_day0');
         expect(output).toContain('- component.update: weather_cond_day1');
         expect(output).toContain('- component.update: my_display');
@@ -161,7 +165,7 @@ describe('weather_forecast esphome_action data source', () => {
         expect(output).toContain('type: daily');
         expect(output).toContain('type: hourly');
         expect(output).toContain('time_t target = base_hour + 2 * 3600;');
-        expect(output).toContain('id(weather_g_high_hplus2) = getf(e["temperature"]);');
+        expect(output).toContain('id(weather_g_high_hplus2) = getf(e[1]);');
         expect(output).toContain('ESPTime::strptime(norm, et)');
         expect(lines.filter(l => l.includes('action: weather.get_forecasts'))).toHaveLength(2);
     });
@@ -184,7 +188,7 @@ describe('weather_forecast esphome_action data source', () => {
         const output = lines.join('\n');
         expect(output).toContain('time_t target = day_start + 9 * 3600;');
         expect(output).toContain('if (now_ts > target + 3600) target += 86400;');
-        expect(output).toContain('id(weather_g_high_h0900) = getf(e["temperature"]);');
+        expect(output).toContain('id(weather_g_high_h0900) = getf(e[1]);');
     });
 
     it('parses ISO datetime offsets so non-UTC forecast timestamps still match', () => {
@@ -238,11 +242,27 @@ describe('weather_forecast esphome_action data source', () => {
         const output = lines.join('\n');
 
         expect(output).toContain('time_t now_ts = t.is_valid() ? t.timestamp : (time_t) -1;');
-        expect(output).toContain('now_ts = parse_ts(std::string(fc[0]["datetime"] | ""));');
+        expect(output).toContain('now_ts = parse_ts(std::string(fc[0][0] | ""));');
         expect(output).toContain('ESP_LOGW("weather", "hourly: ha_time not synced for weather.home; anchoring to first forecast entry (ts=%d)"');
         expect(output).toContain('ESP_LOGW("weather", "hourly: no valid time and no parsable forecast datetime for weather.home; skipping parse");');
         expect(output).toContain('ESP_LOGI("weather", "hourly parse weather.home: entries=%d matched=%d have_time=%d"');
         expect(output).toContain('time_t base_hour = (now_ts / 3600) * 3600;');
         expect(output).not.toContain('if (!t.is_valid()) return;');
+    });
+
+    it('emits an HA-side response_template that compacts each forecast entry to 4 fields', () => {
+        const lines = [];
+        onExportComponents({ lines, widgets: [actionWidget({}, { forecast_mode: 'hourly', hourly_mode: 'relative', relative_count: 1 })], displayId: 'd', isLvgl: false });
+        const output = lines.join('\n');
+
+        expect(output).toContain('response_template: >-');
+        expect(output).toContain("{% set fc = response['weather.home']['forecast'] %}");
+        expect(output).toContain("out.append([e.get('datetime'), e.get('temperature'), e.get('templow'), e.get('condition')])");
+        expect(output).toContain('{{ out | tojson }}');
+        expect(output).toContain('capture_response: true');
+        // hourly lambda reads the compacted array by index
+        expect(output).toContain('parse_ts(std::string(e[0] | "")) == target');
+        expect(output).toContain('getf(e[1])');
+        expect(output).toContain('std::string(e[3] | "")');
     });
 });

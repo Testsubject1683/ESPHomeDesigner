@@ -116,7 +116,7 @@ export const renderProperties = (panel, widget) => {
     ], setTextProp("data_source"));
     if (dataSource === "esphome_action") {
         panel.addLabeledInput("Refresh Interval", "text", props.refresh_interval || "1h", setTextProp("refresh_interval"));
-        panel.addHint("The device calls weather.get_forecasts itself on this interval (e.g. 30min, 1h). Requires ESPHome 2025.10+, HA Core 2025.11+ (for action responses), and 'Allow the device to perform Home Assistant actions' in the HA device options. No HA template sensors are needed.");
+        panel.addHint("The device calls weather.get_forecasts itself on this interval (e.g. 30min, 1h). Requires ESPHome 2025.10+, HA Core 2025.11+ (for action responses), and 'Allow the device to perform Home Assistant actions' in the HA device options. The response is compacted HA-side via response_template to [datetime, temperature, templow, condition] per entry, so it also fits ESP8266's 8 KiB API frame limit (raw hourly responses exceed it and cause BAD_DATA_PACKET disconnects). No HA template sensors are needed.");
     }
 
     panel.addSelect("Forecast Mode", mode, [
