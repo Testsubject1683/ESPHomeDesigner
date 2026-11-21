@@ -4434,7 +4434,7 @@ exports[`Plugin Export Smoke Tests > Export for weather_forecast > should handle
   "                  type: daily",
   "                capture_response: true",
   "                response_template: >-",
-  "                  {% set fc = response['weather.forecast_home']['forecast'] %}{% set out = [] %}{% for e in fc %}{% set _ = out.append([e.get('datetime'), e.get('temperature'), e.get('templow'), e.get('condition')]) %}{% endfor %}{{ out | tojson }}",
+  "                  [{% for e in response['weather.forecast_home']['forecast'] %}{{ [e.get('datetime'), e.get('temperature'), e.get('templow'), e.get('condition')] | tojson }}{% if not loop.last %},{% endif %}{% endfor %}]",
   "                on_success:",
   "                  - lambda: |-",
   "                      JsonDocument doc;",

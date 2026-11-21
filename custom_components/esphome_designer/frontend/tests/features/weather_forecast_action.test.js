@@ -256,9 +256,9 @@ describe('weather_forecast esphome_action data source', () => {
         const output = lines.join('\n');
 
         expect(output).toContain('response_template: >-');
-        expect(output).toContain("{% set fc = response['weather.home']['forecast'] %}");
-        expect(output).toContain("out.append([e.get('datetime'), e.get('temperature'), e.get('templow'), e.get('condition')])");
-        expect(output).toContain('{{ out | tojson }}');
+        expect(output).toContain("{% for e in response['weather.home']['forecast'] %}");
+        expect(output).toContain("[e.get('datetime'), e.get('temperature'), e.get('templow'), e.get('condition')] | tojson");
+        expect(output).toContain('{% if not loop.last %},{% endif %}');
         expect(output).toContain('capture_response: true');
         // hourly lambda reads the compacted array by index
         expect(output).toContain('parse_ts(std::string(e[0] | "")) == target');
