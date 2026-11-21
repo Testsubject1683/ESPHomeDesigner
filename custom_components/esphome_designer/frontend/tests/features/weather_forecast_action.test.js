@@ -183,7 +183,7 @@ describe('weather_forecast esphome_action data source', () => {
         })], displayId: 'd', isLvgl: false });
         const output = lines.join('\n');
         expect(output).toContain('time_t target = day_start + 9 * 3600;');
-        expect(output).toContain('if (t.timestamp > target + 3600) target += 86400;');
+        expect(output).toContain('if (now_ts > target + 3600) target += 86400;');
         expect(output).toContain('id(weather_g_high_h0900) = getf(e["temperature"]);');
     });
 
@@ -226,5 +226,23 @@ describe('weather_forecast esphome_action data source', () => {
         expect(output).not.toContain('int matched = 0;');
         expect(output).not.toContain('hourly: no forecast entry matched');
         expect(output).toContain('if (0 < fc.size()) {');
+    });
+
+    it('falls back to the first forecast entry when ha_time is not synced, and logs a summary', () => {
+        const lines = [];
+        onExportComponents({ lines, widgets: [actionWidget({}, {
+            forecast_mode: 'hourly',
+            hourly_mode: 'relative',
+            relative_count: 1
+        })], displayId: 'd', isLvgl: false });
+        const output = lines.join('\n');
+
+        expect(output).toContain('time_t now_ts = t.is_valid() ? t.timestamp : (time_t) -1;');
+        expect(output).toContain('now_ts = parse_ts(std::string(fc[0]["datetime"] | ""));');
+        expect(output).toContain('ESP_LOGW("weather", "hourly: ha_time not synced for weather.home; anchoring to first forecast entry (ts=%d)"');
+        expect(output).toContain('ESP_LOGW("weather", "hourly: no valid time and no parsable forecast datetime for weather.home; skipping parse");');
+        expect(output).toContain('ESP_LOGI("weather", "hourly parse weather.home: entries=%d matched=%d have_time=%d"');
+        expect(output).toContain('time_t base_hour = (now_ts / 3600) * 3600;');
+        expect(output).not.toContain('if (!t.is_valid()) return;');
     });
 });

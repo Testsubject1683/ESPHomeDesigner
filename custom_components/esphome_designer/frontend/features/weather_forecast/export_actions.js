@@ -119,9 +119,6 @@ const buildParseLambdaLines = (entity, slots, type) => {
     }
 
     body.push(`auto t = id(ha_time).now();`);
-    body.push(`if (!t.is_valid()) return;`);
-    body.push(`time_t base_hour = (t.timestamp / 3600) * 3600;`);
-    body.push(`time_t day_start = t.timestamp - ((time_t) t.hour * 3600 + (time_t) t.minute * 60 + t.second);`);
     // HA passes forecast datetimes through unnormalized: the wall-clock part may
     // carry a non-UTC offset (e.g. ...T15:00:00+01:00). Parse that offset so the
     // result is a true UTC epoch regardless of the source timezone.
@@ -144,6 +141,22 @@ const buildParseLambdaLines = (entity, slots, type) => {
     body.push(`  }`);
     body.push(`  return ts;`);
     body.push(`};`);
+    body.push(`time_t now_ts = t.is_valid() ? t.timestamp : (time_t) -1;`);
+    body.push(`int lhour = t.hour, lmin = t.minute, lsec = t.second;`);
+    body.push(`if (now_ts < 0 && fc.size() > 0) {`);
+    body.push(`  now_ts = parse_ts(std::string(fc[0]["datetime"] | ""));`);
+    body.push(`  if (now_ts >= 0) {`);
+    body.push(`    ESPTime nt = ESPTime::from_epoch_utc(now_ts);`);
+    body.push(`    lhour = nt.hour; lmin = nt.minute; lsec = nt.second;`);
+    body.push(`    ESP_LOGW("weather", "hourly: ha_time not synced for ${entity}; anchoring to first forecast entry (ts=%d)", (int) now_ts);`);
+    body.push(`  }`);
+    body.push(`}`);
+    body.push(`if (now_ts < 0) {`);
+    body.push(`  ESP_LOGW("weather", "hourly: no valid time and no parsable forecast datetime for ${entity}; skipping parse");`);
+    body.push(`  return;`);
+    body.push(`}`);
+    body.push(`time_t base_hour = (now_ts / 3600) * 3600;`);
+    body.push(`time_t day_start = now_ts - ((time_t) lhour * 3600 + (time_t) lmin * 60 + lsec);`);
     body.push(`int matched = 0;`);
 
     slots.forEach(slot => {
@@ -153,7 +166,7 @@ const buildParseLambdaLines = (entity, slots, type) => {
             body.push(`  time_t target = base_hour + ${slot.kind.hoursAhead} * 3600;`);
         } else {
             body.push(`  time_t target = day_start + ${slot.kind.hour} * 3600;`);
-            body.push(`  if (t.timestamp > target + 3600) target += 86400;`);
+            body.push(`  if (now_ts > target + 3600) target += 86400;`);
         }
         body.push(`  for (JsonVariantConst e : fc) {`);
         body.push(`    if (parse_ts(std::string(e["datetime"] | "")) == target) {`);
@@ -168,6 +181,7 @@ const buildParseLambdaLines = (entity, slots, type) => {
     body.push(`if (matched == 0 && fc.size() > 0) {`);
     body.push(`  ESP_LOGW("weather", "hourly: no forecast entry matched for ${entity} (entries=%d first_datetime=%s)", (int) fc.size(), std::string(fc[0]["datetime"] | "").c_str());`);
     body.push(`}`);
+    body.push(`ESP_LOGI("weather", "hourly parse ${entity}: entries=%d matched=%d have_time=%d", (int) fc.size(), matched, t.is_valid() ? 1 : 0);`);
     return body;
 };
 
