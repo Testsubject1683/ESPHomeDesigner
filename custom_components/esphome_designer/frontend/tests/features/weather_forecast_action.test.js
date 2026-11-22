@@ -259,7 +259,7 @@ describe('weather_forecast esphome_action data source', () => {
         const output = lines.join('\n');
 
         expect(output).toContain('response_template: >-');
-        expect(output).toContain("{% for e in response['weather.home']['forecast'] %}");
+        expect(output).toContain("{% for e in response['weather.home']['forecast'][:48] %}");
         expect(output).toContain("[e.get('datetime'), e.get('temperature'), e.get('templow'), e.get('condition')] | tojson");
         expect(output).toContain('{% if not loop.last %},{% endif %}');
         expect(output).toContain('capture_response: true');

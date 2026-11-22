@@ -260,12 +260,13 @@ export const onExportComponents = (context) => {
         entries.push(`                  type: ${group.type}`);
         entries.push(`                capture_response: true`);
         // HA-side Jinja compaction: only [datetime, temperature, templow, condition] per
-        // entry are sent back, keeping the frame under ESP8266's 8 KiB API limit.
+        // entry, capped at 48 entries (covers fixed-hour slots up to tomorrow), keeping the
+        // frame under ESP8266's 8 KiB API limit even for providers with long hourly horizons.
         entries.push(`                response_template: >-`);
         // HA renders response_template in a sandboxed Jinja env: list.append is
         // blocked ("unsafe"), so build the JSON array with a plain list display in
         // a for loop instead.
-        entries.push(`                  [{% for e in response['${group.entity}']['forecast'] %}{{ [e.get('datetime'), e.get('temperature'), e.get('templow'), e.get('condition')] | tojson }}{% if not loop.last %},{% endif %}{% endfor %}]`);
+        entries.push(`                  [{% for e in response['${group.entity}']['forecast'][:48] %}{{ [e.get('datetime'), e.get('temperature'), e.get('templow'), e.get('condition')] | tojson }}{% if not loop.last %},{% endif %}{% endfor %}]`);
         entries.push(`                on_success:`);
         entries.push(`                  - lambda: |-`);
         lambdaBody.forEach(l => entries.push(`                      ${l}`));
