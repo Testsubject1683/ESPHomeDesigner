@@ -109,8 +109,11 @@ describe('weather_forecast esphome_action data source', () => {
         expect(output).toContain('type: daily');
         expect(output).toContain('capture_response: true');
         expect(output).toContain('on_success:');
-        expect(output).toContain('JsonArrayConst fc = doc.as<JsonArrayConst>();');
-        expect(output).toContain('deserializeJson(doc, response["response"].as<const char*>())');
+        expect(output).toContain('JsonArrayConst fc;');
+        expect(output).toContain('JsonVariantConst r = response["response"];');
+        expect(output).toContain('r.is<JsonArrayConst>()');
+        expect(output).toContain('std::string raw = r.as<std::string>();');
+        expect(output).toContain('deserializeJson(doc, raw)');
         expect(output).toContain('response_template: >-');
         expect(output).toContain("response['weather.home']['forecast']");
         expect(output).toContain('tojson');

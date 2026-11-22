@@ -99,12 +99,21 @@ const buildParseLambdaLines = (entity, slots, type) => {
     // array string: [[datetime, temperature, templow, condition], ...]. Keeping only
     // these fields keeps the response frame below ESP8266's 8 KiB API frame limit
     // (MAX_MESSAGE_SIZE); the raw forecast array can exceed it (BAD_DATA_PACKET).
+    // ArduinoJson v7 stores parsed strings as non-null-terminated StringRefs, so copy
+    // via as<std::string>() before re-parsing; also accept an already-parsed array.
     body.push(`JsonDocument doc;`);
-    body.push(`if (deserializeJson(doc, response["response"].as<const char*>())) {`);
-    body.push(`  ESP_LOGW("weather", "Bad forecast JSON for ${entity} (needs HA Core >= 2025.11, ESPHome >= 2025.10, capture_response + response_template)");`);
-    body.push(`  return;`);
+    body.push(`JsonVariantConst r = response["response"];`);
+    body.push(`JsonArrayConst fc;`);
+    body.push(`if (!r.isNull() && r.is<JsonArrayConst>()) {`);
+    body.push(`  fc = r.as<JsonArrayConst>();`);
+    body.push(`} else {`);
+    body.push(`  std::string raw = r.as<std::string>();`);
+    body.push(`  if (raw.empty() || deserializeJson(doc, raw)) {`);
+    body.push(`    ESP_LOGW("weather", "Bad forecast JSON for ${entity} (needs HA Core >= 2025.11, ESPHome >= 2025.10, capture_response + response_template): head=%.60s", raw.c_str());`);
+    body.push(`    return;`);
+    body.push(`  }`);
+    body.push(`  fc = doc.as<JsonArrayConst>();`);
     body.push(`}`);
-    body.push(`JsonArrayConst fc = doc.as<JsonArrayConst>();`);
     body.push(`if (fc.isNull()) {`);
     body.push(`  ESP_LOGW("weather", "No forecast array for ${entity}: response_empty=%d has_response_key=%d (action responses need HA Core >= 2025.11 and ESPHome >= 2025.10)", response.isNull() ? 1 : 0, response["response"].isNull() ? 0 : 1);`);
     body.push(`  return;`);
